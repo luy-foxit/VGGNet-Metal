@@ -3,6 +3,51 @@ import QuartzCore
 
 /* Helper functions for creating the layers. */
 
+class DataSource: NSObject, MPSCNNConvolutionDataSource {
+    let name: String
+    let outDesc: MPSCNNConvolutionDescriptor
+    let weight: UnsafeMutableRawPointer
+    let bias: UnsafeMutablePointer<Float>?
+    
+    init(_ name: String, _ desc: MPSCNNConvolutionDescriptor,
+         _ kernelWeights: UnsafePointer<Float>, _ biasTerms: UnsafePointer<Float>?) {
+        self.name = name
+        self.outDesc = desc
+        
+        self.weight = UnsafeMutableRawPointer(UnsafeMutablePointer<Float>(mutating: kernelWeights))
+        self.bias = UnsafeMutablePointer(mutating: biasTerms)
+    }
+    
+    func descriptor() -> MPSCNNConvolutionDescriptor {
+        return self.outDesc
+    }
+    
+    func weights() -> UnsafeMutableRawPointer {
+        return self.weight
+    }
+    
+    func biasTerms() -> UnsafeMutablePointer<Float>? {
+        return self.bias
+    }
+    
+    func load() -> Bool {
+        return true
+    }
+    
+    func purge() {
+        //wData = nil
+    }
+    
+    func label() -> String? {
+        return name
+    }
+    
+    func dataType() -> MPSDataType {
+        return .float32
+    }
+}
+
+
 private func makeConv(device: MTLDevice,
                       inDepth: Int,
                       outDepth: Int,
@@ -23,11 +68,18 @@ private func makeConv(device: MTLDevice,
   desc.strideInPixelsX = 1
   desc.strideInPixelsY = 1
 
-  let conv = MPSCNNConvolution(device: device,
-                               convolutionDescriptor: desc,
-                               kernelWeights: weights,
-                               biasTerms: bias,
-                               flags: MPSCNNConvolutionFlags.none)
+    var conv: MPSCNNConvolution
+    if #available(iOS 11.0, *) {
+        let weights:DataSource = DataSource("", desc, weights, bias)
+        conv = MPSCNNConvolution(device: device, weights: weights)
+
+    } else {
+        conv = MPSCNNConvolution(device: device,
+                                     convolutionDescriptor: desc,
+                                     kernelWeights: weights,
+                                     biasTerms: bias,
+                                     flags: MPSCNNConvolutionFlags.none)
+    }
 
   // To preserve the width and height between conv layers, VGGNet assumes one
   // pixel of padding around the edges. Metal apparently has no problem reading
