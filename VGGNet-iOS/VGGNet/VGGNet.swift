@@ -2,7 +2,8 @@ import MetalPerformanceShaders
 import QuartzCore
 
 /* Helper functions for creating the layers. */
-
+public var initTime:CFTimeInterval = 0
+public var predictTime:CFTimeInterval = 0
 class DataSource: NSObject, MPSCNNConvolutionDataSource {
     let name: String
     let outDesc: MPSCNNConvolutionDescriptor
@@ -293,7 +294,8 @@ public class VGGNet {
     softmax = MPSCNNSoftMax(device: device)
 
     let endTime = CACurrentMediaTime()
-    print("Elapsed time: \(endTime - startTime) sec")
+    initTime = endTime - startTime
+    print("Init Elapsed time: \(endTime - startTime) sec")
   }
 
   /* Performs the inference step. This takes the input image, converts it into
@@ -307,9 +309,13 @@ public class VGGNet {
       let commandBuffer = commandQueue.makeCommandBuffer()
 
       // This lets us squeeze some extra speed out of Metal.
-      MPSTemporaryImage.prefetchStorage(with: commandBuffer, imageDescriptorList: [
-        input_id, conv1_id, pool1_id, conv2_id, pool2_id, conv3_id, pool3_id,
-        conv4_id, pool4_id, conv5_id, pool5_id, fc_id, output_id ])
+        let imageDescriptorList = [
+            input_id, conv1_id, pool1_id, conv2_id, pool2_id, conv3_id, pool3_id,
+            conv4_id, pool4_id, conv5_id, pool5_id, fc_id, output_id ]
+        for imageDesc in imageDescriptorList {
+            imageDesc.storageMode = .private
+        }
+      MPSTemporaryImage.prefetchStorage(with: commandBuffer, imageDescriptorList: imageDescriptorList)
 
       // Scale the input image to 224x224 pixels.
       let img1 = MPSTemporaryImage(commandBuffer: commandBuffer, imageDescriptor: input_id)
@@ -414,7 +420,8 @@ public class VGGNet {
     let result = self.labels.top5Labels(prediction: self.outputImage.toFloatArray())
 
     let endTime = CACurrentMediaTime()
-    print("Elapsed time: \(endTime - startTime) sec")
+    predictTime = endTime - startTime
+    print("Predict Elapsed time: \(endTime - startTime) sec")
 
     return result
   }

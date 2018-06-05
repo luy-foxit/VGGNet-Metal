@@ -105,6 +105,7 @@ class ViewController: UIViewController, VideoCaptureDelegate {
 
   private func show(prediction: [Prediction]) {
     var s: [String] = []
+    s.append(String(format: "init %f sec, pre %f sec", initTime, predictTime))
     for (i, pred) in prediction.enumerated() {
       s.append(String(format: "%d: %@ (%3.2f%%)", i + 1, pred.label, pred.probability * 100))
     }
